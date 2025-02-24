@@ -55,13 +55,19 @@ async function fetchRaydiumMints(txId, connection) {
         const tokenAAccount = accounts[tokenAIndex];
         const tokenBAccount = accounts[tokenBIndex];
     
-        const displayData = [
-            { "Token": "A", "Account Public Key": tokenAAccount.toBase58() },
-            { "Token": "B", "Account Public Key": tokenBAccount.toBase58() }
-        ];
+        const displayData = 
+            {  "inputMint":  tokenBAccount.toBase58(),
+                "outputMint":  tokenAAccount.toBase58(),
+                "amount": 1000000000,
+                "slippageBps": 50,
+                "priorityFee": 1000,
+                "computeUnits": 400000,
+                "jitoTip": 100000,
+             }
+        ;
 
         console.log("New LP Found");
-        console.table(displayData);
+        console.log(displayData);
     
     } catch (error) {
         console.log("Error fetching transaction:", txId, error);
