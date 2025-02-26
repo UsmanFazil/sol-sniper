@@ -1,5 +1,6 @@
 const { Connection, PublicKey } = require('@solana/web3.js');
-require('dotenv').config()
+const fs = require('fs'); // File system module for writing JSON
+require('dotenv').config();
 
 const RAYDIUM_PUBLIC_KEY = process.env.RAYDIUM_PUBLIC_KEY;
 const RAYDIUM_PUBLIC_KEY_DEVNET = process.env.RAYDIUM_PUBLIC_KEY_DEVNET;
@@ -68,6 +69,7 @@ async function fetchRaydiumMints(txId, connection) {
 
         console.log("New LP Found");
         console.log(displayData);
+        saveToFile(displayData);
     
     } catch (error) {
         console.log("Error fetching transaction:", txId, error);
@@ -76,3 +78,37 @@ async function fetchRaydiumMints(txId, connection) {
 }
 
 startConnection(connection, RAYDIUM, INSTRUCTION_NAME).catch(console.error);
+
+// ✅ Function to append new data instead of overwriting
+function saveToFile(newData) {
+    const filePath = "output.json";
+
+    // Read existing file if it exists
+    fs.readFile(filePath, "utf8", (err, fileData) => {
+        let jsonArray = [];
+
+        if (!err && fileData) {
+            try {
+                jsonArray = JSON.parse(fileData); // Parse existing JSON array
+                if (!Array.isArray(jsonArray)) {
+                    jsonArray = []; // Ensure it's an array
+                }
+            } catch (parseErr) {
+                console.error("❌ Error parsing JSON file:", parseErr);
+                jsonArray = []; // Reset to empty array on parse failure
+            }
+        }
+
+        // Append the new data to the array
+        jsonArray.push(newData);
+
+        // Write updated data back to the file
+        fs.writeFile(filePath, JSON.stringify(jsonArray, null, 2), (writeErr) => {
+            if (writeErr) {
+                console.error("❌ Error writing to file:", writeErr);
+            } else {
+                console.log(`✅ New data appended to ${filePath}`);
+            }
+        });
+    });
+}
