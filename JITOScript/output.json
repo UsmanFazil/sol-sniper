@@ -1,0 +1,20 @@
+[
+  {
+    "inputMint": "So11111111111111111111111111111111111111112",
+    "outputMint": "BMAfFr6YXHdVsxpKCETn7FC6RiQd2zFZqGP7q4Fpump",
+    "amount": 1000000000,
+    "slippageBps": 50,
+    "priorityFee": 1000,
+    "computeUnits": 400000,
+    "jitoTip": 100000
+  },
+  {
+    "inputMint": "B3yLXxhfwCEoT6zRxv4wogELQgK4wnXb4KBr8nvcpump",
+    "outputMint": "So11111111111111111111111111111111111111112",
+    "amount": 1000000000,
+    "slippageBps": 50,
+    "priorityFee": 1000,
+    "computeUnits": 400000,
+    "jitoTip": 100000
+  }
+]

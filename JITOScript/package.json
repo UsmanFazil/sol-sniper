@@ -1,0 +1,24 @@
+{
+    "name": "jito-ex",
+    "version": "1.0.0",
+    "main": "index.js",
+    "type": "module",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "description": "",
+    "dependencies": {
+        "@jup-ag/api": "^6.0.40",
+        "@solana/web3.js": "^1.98.0",
+        "base58": "^2.0.1",
+        "bs58": "^6.0.0",
+        "dotenv": "^16.4.7",
+        "fs-extra": "^11.3.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.13.5"
+    }
+}
