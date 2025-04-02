@@ -1,7 +1,9 @@
+const { exec } = require("child_process");
+
+const jsonInput = JSON.stringify({ amount: 100, token: "USDT" });
 const { Connection, PublicKey } = require('@solana/web3.js');
 const fs = require('fs');
 require('dotenv').config();
-const { processNewLP } = require('./RaydiumSwap/utils'); // Import TypeScript function
 
 
 const RAYDIUM_PUBLIC_KEY = process.env.RAYDIUM_PUBLIC_KEY;
@@ -107,18 +109,38 @@ async function fetchRaydiumMints(txId, connection) {
         };
 
         console.log("New LP Found", newPair);
-        // Call it before the catch block
-        processNewLP(newPair);
+        console.log("Executing command:", `npx ts-node ./src/index.ts '${JSON.stringify(newPair)}'`);
+        var timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        var directory = "./LPJson"; // Change this to your desired directory
+        var filePath = `${directory}/output_${timestamp}.json`;
+        // var filePath = `output_${timestamp}.json`;
+        saveToFile(newPair, filePath);
 
-       // saveToFile(newPair);
+
+
+        const jsonArg = `'${JSON.stringify(newPair).replace(/'/g, "\\'")}'`; 
+
+        // Call it before the catch block
+        var command = `npx ts-node ./src/index.ts '${baseMint}' '${quoteMint}' '${timestamp}'`;
+        
+        exec(command, (error, stdout, stderr) => {
+          if (error) {
+            console.error(`Error is: ${error.message} ${stdout} ${stderr}`);
+            return;
+          }
+          if (stderr) {
+            console.error(`Stderr: ${stderr}`);
+            return;
+          }
+          console.log(`Output: ${stdout}`);
+        });
     } catch (error) {
         console.log("Error fetching transaction:", txId, error);
     }
 }
 
 
-function saveToFile(newData) {
-    const filePath = "output.json";
+function saveToFile(newData,filePath) {
 
     fs.readFile(filePath, "utf8", (err, fileData) => {
         let jsonArray = { "official": [] };
@@ -147,3 +169,5 @@ function saveToFile(newData) {
 }
 
 startConnection(connection, RAYDIUM, INSTRUCTION_NAME).catch(console.error);
+
+

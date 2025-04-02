@@ -1,0 +1,32 @@
+{
+  "official": [
+    {
+      "id": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "baseMint": "8guDPpbsVCTMzf9Wx7WMaUYZFdxhDPcZJ4gGs6ruyeET",
+      "quoteMint": "So11111111111111111111111111111111111111112",
+      "lpMint": "J2onpKTqXH7d1XyWpzZHLShThKfsJgucw3hbiRArzgtQ",
+      "baseDecimals": 6,
+      "quoteDecimals": 9,
+      "lpDecimals": 9,
+      "version": 4,
+      "programId": "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
+      "authority": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "withdrawQueue": "11111111111111111111111111111111",
+      "lpVault": "11111111111111111111111111111111",
+      "marketVersion": 4,
+      "marketProgramId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX",
+      "marketId": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+      "marketAuthority": "11111111111111111111111111111111",
+      "marketBaseVault": "SysvarRent111111111111111111111111111111111",
+      "marketQuoteVault": "4XrBBgJqMTv5ETzCEVCwVbWo5fiCrCevWqaHSVnDFiVB",
+      "marketBids": "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1",
+      "marketAsks": "FrcB4X1JhMyu4UJLfGuZCemR2fDHBkS9EkLSjwAs9Ezy",
+      "marketEventQueue": "3gcR8RiE54vrTv9QVxap8LBmpyCuVKc6fPgKbPtXByYh",
+      "lookupTableAccount": "6N762vhUEb6MsFPQt3aPDsWbSr2PvERykkeFbGL1vtt6",
+      "openOrders": "7YvziNzVMPbEey3vzKSaaLwXPpkNnGfenLtyyWHUHXmV",
+      "targetOrders": "9DCxsMizn3H1hprZ7xWe6LDzeUeZBksYFpBWBtSf1PQX",
+      "baseVault": "7YttLkHDoNj9wyDur5pM1ejNaAvT9X4eqaYcHQqtj2G5",
+      "quoteVault": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
+    }
+  ]
+}
