@@ -1,7 +1,39 @@
+import mongoose from 'mongoose';
 import RaydiumSwap from './RaydiumSwap';
 import { Transaction, VersionedTransaction } from '@solana/web3.js';
 import 'dotenv/config';
 import { swapConfig } from './swapConfig'; // Import the configuration
+
+// MongoDB connection
+mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/raydium_swaps')
+.then(() => console.log('✅ Connected to MongoDB'))
+  .catch(err => console.error('❌ MongoDB connection error:', err));
+
+// Define a schema for storing swap details
+const swapSchema = new mongoose.Schema({
+  baseToken: String,
+  quoteToken: String,
+  amount: Number,
+  txid: String,
+  status: String,  // 'Success' or 'Failed'
+  errorMessage: String, // Store error if any
+  timestamp: { type: Date, default: Date.now },
+});
+
+const SwapModel = mongoose.model('Swap', swapSchema);
+
+// Function to save swap details
+const saveSwapDetails = async (data: any) => {
+  try {
+    const swapEntry = new SwapModel(data);
+    await swapEntry.save();
+    console.log('✅ Swap details saved to MongoDB');
+  } catch (error) {
+    console.error('❌ Failed to save swap details:', error);
+  }
+};
+
+
 
 /**
  * Performs a token swap on the Raydium protocol.
@@ -56,10 +88,22 @@ const swap = async () => {
   const poolInfo = raydiumSwap.findPoolInfoForTokens(swapConfig.tokenAAddress, swapConfig.tokenBAddress);
   if (!poolInfo) {
     console.error('Pool info not found');
+
+      await saveSwapDetails({
+        baseToken,
+        quoteToken,
+        amount: swapConfig.tokenAAmount,
+        txid: null,
+        status: "Failed",
+        errorMessage: "Pool info not found",
+      });
+
     return 'Pool info not found';
   } else {
     console.log('Found pool info');
   }
+
+  try {
 
   /**
    * Prepare the swap transaction with the given parameters.
@@ -84,7 +128,16 @@ const swap = async () => {
       ? await raydiumSwap.sendVersionedTransaction(tx as VersionedTransaction, swapConfig.maxRetries)
       : await raydiumSwap.sendLegacyTransaction(tx as Transaction, swapConfig.maxRetries);
 
-    console.log(`https://solscan.io/tx/${txid}`);
+    console.log(` Swap Successful: https://solscan.io/tx/${txid}`);
+
+    await saveSwapDetails({
+      baseToken,
+      quoteToken,
+      amount: swapConfig.tokenAAmount,
+      txid,
+      status: "Success",
+      errorMessage: null,
+    });
 
   } else {
     /**
@@ -96,6 +149,18 @@ const swap = async () => {
 
     console.log(simRes);
   }
+} catch (error: any) {
+  console.error("❌ Swap Failed:", error.message);
+  
+  await saveSwapDetails({
+    baseToken,
+    quoteToken,
+    amount: swapConfig.tokenAAmount,
+    txid: null,
+    status: "Failed",
+    errorMessage: error.message,
+  });
+}
 };
 
 swap();
