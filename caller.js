@@ -32,78 +32,110 @@ async function startConnection(connection, programAddress, searchInstruction) {
     );
 }
 
-async function fetchDecimals(mintAddress) {
+
+async function fetchDecimals(mint) {
     try {
-        const tokenInfo = await connection.getTokenSupply(new PublicKey(mintAddress));
-        return tokenInfo.value.decimals;
-    } catch (error) {
-        console.error("Error fetching decimals for", mintAddress, error);
+        const mintAccountInfo = await connection.getParsedAccountInfo(new PublicKey(mint));
+        const parsed = mintAccountInfo.value?.data?.parsed;
+
+        if (
+            mintAccountInfo.value?.owner?.toBase58() !== "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" ||
+            parsed?.info?.decimals === undefined
+        ) {
+            throw new Error("Not a valid mint account");
+        }
+
+        return parsed.info.decimals;
+    } catch (err) {
+        console.error(`Error fetching decimals for ${mint}`, err);
         return null;
     }
 }
 
+
 async function fetchRaydiumMints(txId, connection) {
     try {
-        const tx = await connection.getParsedTransaction(txId, {
-            maxSupportedTransactionVersion: 0,
-            commitment: 'confirmed'
-        });
+    const tx = await connection.getParsedTransaction(txId, {
+        maxSupportedTransactionVersion: 0,
+        commitment: 'confirmed'
+    });
+    
+    if (!tx || !tx.transaction || !tx.transaction.message.instructions) {
+        console.log("No transaction data found.");
+        return;
+    }
+    
+    const instruction = tx.transaction.message.instructions.find(ix => ix.programId.toBase58() === RAYDIUM_PUBLIC_KEY);
+    if (!instruction || !instruction.accounts) {
+        console.log("No matching instruction found in transaction.");
+        return;
+    }
+    
+    const accounts = instruction.accounts.map(account => account.toBase58());
+    
+    console.log("accounts:", accounts);
+   
+    const baseMint = accounts[9];
+    const quoteMint = accounts[8];
+    
+    const lpMint = accounts[7];
 
-        if (!tx || !tx.transaction || !tx.transaction.message.instructions) {
-            console.log("No transaction data found.");
-            return;
-        }
+const lpDecimalss = await fetchDecimals(lpMint);
 
-        const instruction = tx.transaction.message.instructions.find(ix => ix.programId.toBase58() === RAYDIUM_PUBLIC_KEY);
-        if (!instruction || !instruction.accounts) {
-            console.log("No matching instruction found in transaction.");
-            return;
-        }
+    const [baseDecimals, quoteDecimals] = await Promise.all([
+        fetchDecimals(baseMint),
+        fetchDecimals(quoteMint)    
+    ]);
 
-        const baseMint = instruction.accounts[8]?.toBase58();
-        const quoteMint = instruction.accounts[9]?.toBase58();
-        const lpMint = instruction.accounts[10]?.toBase58() || "";
+    const [authority, _] = await PublicKey.findProgramAddress(
+        [Buffer.from("amm authority"), new PublicKey(accounts[4]).toBuffer()],
+        new PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8") // Raydium AMM programId
+      );
+      
+      console.log("Pool ID (AMM ID):", accounts[4]);
+      console.log("Base Mint:", baseMint);
+      console.log("Quote Mint:", quoteMint);
+      console.log("LP Mint:", lpMint);
+      
+      console.log("marketAuthority:", accounts[2]);
+      console.log("marketBaseVault:", accounts[3]);
+      console.log("marketQuoteVault:", accounts[4]);
+      console.log("marketBids:", accounts[5]);
+      console.log("marketAsks:", accounts[6]);
+      console.log("marketEventQueue:", accounts[7]);
+      
+      console.log("baseVault:", accounts[14]);
+      console.log("quoteVault:", accounts[15]);
 
-        if (!baseMint || !quoteMint) {
-            console.log("Could not extract token mint addresses.");
-            return;
-        }
-
-        const [baseDecimals, quoteDecimals, lpDecimals] = await Promise.all([
-            fetchDecimals(baseMint),
-            fetchDecimals(quoteMint),
-            fetchDecimals(lpMint)
-        ]);
-
-        const newPair = {
-            "official": [
-                {
-                    "id": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-                    "baseMint": baseMint,
-                    "quoteMint": quoteMint,
-                    "lpMint": lpMint,
-                    "baseDecimals": baseDecimals || 9,
-                    "quoteDecimals": quoteDecimals || 6,
-                    "lpDecimals": lpDecimals || 9,
-                    "version": 4,
-                    "programId": RAYDIUM_PUBLIC_KEY,
-                    "authority": instruction.accounts[0]?.toBase58() || "",
-                    "withdrawQueue": "11111111111111111111111111111111",
-                    "lpVault": "11111111111111111111111111111111",
-                    "marketVersion": 4,
-                    "marketProgramId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX",
-                    "marketId": instruction.accounts[1]?.toBase58() || "",
-                    "marketAuthority": instruction.accounts[2]?.toBase58() || "",
-                    "marketBaseVault": instruction.accounts[3]?.toBase58() || "",
-                    "marketQuoteVault": instruction.accounts[4]?.toBase58() || "",
-                    "marketBids": instruction.accounts[5]?.toBase58() || "",
-                    "marketAsks": instruction.accounts[6]?.toBase58() || "",
-                    "marketEventQueue": instruction.accounts[7]?.toBase58() || "",
-                    "lookupTableAccount": instruction.accounts[11]?.toBase58() || "",
-                    "openOrders": instruction.accounts[12]?.toBase58() || "",
-                    "targetOrders": instruction.accounts[13]?.toBase58() || "",
-                    "baseVault": instruction.accounts[14]?.toBase58() || "",
-                    "quoteVault": instruction.accounts[15]?.toBase58() || ""
+    const newPair = {
+        official: [
+            {
+                id: accounts[4],  // ✅ Pool address (Raydium AMM ID / main pool)
+                baseMint,
+                quoteMint,
+                lpMint,
+                baseDecimals: baseDecimals || 9,
+                quoteDecimals: quoteDecimals || 6,
+                lpDecimals: lpDecimalss || 9,
+                version: 4,
+                programId: "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
+                authority: "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1",
+                openOrders: accounts[6],
+                targetOrders: "CZza3Ej4Mc58MnxWA385itCC9jCo3L1D7zc3LKy1bZMR",
+                baseVault: "DQyrAcCrDXQ7NeoqGgDCZwBvWDcYmFCjSb9JtteuvPpz",
+                quoteVault: "HLmqeL62xR1QoZ1HKKbXRrdN1p3phKpxRMb2VVopvBBz",        
+                withdrawQueue: "11111111111111111111111111111111",
+                lpVault: "11111111111111111111111111111111",
+                marketVersion: 4,
+                marketProgramId: "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX",
+                marketId: "8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6",
+                marketAuthority: "CTz5UMLQm2SRWHzQnU62Pi4yJqbNGjgRBHqqp6oDHfF7",
+                marketBaseVault: "CKxTHwM9fPMRRvZmFnFoqKNd9pQR21c5Aq9bh5h9oghX",
+                marketQuoteVault: "6A5NHCj1yF6urc9wZNe6Bcjj4LVszQNj5DwAWG97yzMu",
+                marketBids: "5jWUncPNBMZJ3sTHKmMLszypVkoRK6bfEQMQUHweeQnh",
+                marketAsks: "EaXdHx7x3mdGA38j5RSmKYSXMzAFzzUXCLNBEDXDn1d5",
+                marketEventQueue: "8CvwxZ9Db6XbLD46NZwwmVDZZRDy7eydFcAGkXKh9axa",
+                lookupTableAccount: "3q8sZGGpPESLxurJjNmr7s7wcKS5RPCCHMagbuHP9U2W"
                 }
             ]
         };
@@ -111,12 +143,14 @@ async function fetchRaydiumMints(txId, connection) {
         console.log("New LP Found", newPair);
         console.log("Executing command:", `npx ts-node ./src/index.ts '${JSON.stringify(newPair)}'`);
         var timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        //var timestamp = "1";
+
         var directory = "./LPJson"; // Change this to your desired directory
-        var filePath = `${directory}/output_${timestamp}.json`;
-        // var filePath = `output_${timestamp}.json`;
-        saveToFile(newPair, filePath);
+       var filePath = `${directory}/output_${timestamp}.json`;
+       //var filePath = `${directory}/output_1.json`;
 
-
+       //var filePath = `output_${timestamp}.json`;
+       saveToFile(newPair, filePath);
 
         const jsonArg = `'${JSON.stringify(newPair).replace(/'/g, "\\'")}'`; 
 

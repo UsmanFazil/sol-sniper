@@ -82,6 +82,15 @@ const swap = async () => {
   console.log(`Loaded pool keys`);
 
 
+  await saveSwapDetails({
+    baseToken,
+    quoteToken,
+    amount: 22,
+    txid: null,
+    status: "Loaded pool keys",
+    errorMessage: null,
+  });
+  
   /**
    * Find pool information for the given token pair.
    */
@@ -104,7 +113,14 @@ const swap = async () => {
   }
 
   try {
-
+    await saveSwapDetails({
+      baseToken,
+      quoteToken,
+      amount: 10,
+      txid: poolInfo.quoteMint.toString(),
+      status: swapConfig,
+    });
+    
   /**
    * Prepare the swap transaction with the given parameters.
    */
@@ -116,7 +132,15 @@ const swap = async () => {
     swapConfig.useVersionedTransaction,
     swapConfig.direction
   );
-    console.log("Swapping")
+
+    await saveSwapDetails({
+      baseToken,
+      quoteToken,
+      amount: 10,
+      txid: tx,
+      status: "Swapping done in progress",
+    });
+
   /**
    * Depending on the configuration, execute or simulate the swap.
    */
@@ -148,6 +172,15 @@ const swap = async () => {
       : await raydiumSwap.simulateLegacyTransaction(tx as Transaction);
 
     console.log(simRes);
+    await saveSwapDetails({
+      baseToken,
+      quoteToken,
+      amount: swapConfig.tokenAAmount,
+      txid: null,
+      status: "simulate successful",
+      errorMessage: null,
+    });
+
   }
 } catch (error: any) {
   console.error("❌ Swap Failed:", error.message);
@@ -157,7 +190,7 @@ const swap = async () => {
     quoteToken,
     amount: swapConfig.tokenAAmount,
     txid: null,
-    status: "Failed",
+    status: "Failed error",
     errorMessage: error.message,
   });
 }
