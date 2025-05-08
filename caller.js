@@ -80,18 +80,19 @@ async function fetchRaydiumMints(txId, connection) {
     
     const lpMint = accounts[7];
 
-const lpDecimalss = await fetchDecimals(lpMint);
+    const lpDecimalss = await fetchDecimals(lpMint);
 
     const [baseDecimals, quoteDecimals] = await Promise.all([
         fetchDecimals(baseMint),
         fetchDecimals(quoteMint)    
     ]);
 
-    const [authority, _] = await PublicKey.findProgramAddress(
-        [Buffer.from("amm authority"), new PublicKey(accounts[4]).toBuffer()],
-        new PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8") // Raydium AMM programId
-      );
       
+      const [authority] = await PublicKey.findProgramAddress(
+        [Buffer.from("amm authority"), new PublicKey(accounts[4]).toBuffer()],
+        new PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8") // raydium amm program id
+      );
+
       console.log("Pool ID (AMM ID):", accounts[4]);
       console.log("Base Mint:", baseMint);
       console.log("Quote Mint:", quoteMint);
@@ -119,11 +120,11 @@ const lpDecimalss = await fetchDecimals(lpMint);
                 lpDecimals: lpDecimalss || 9,
                 version: 4,
                 programId: "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8",
-                authority: "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1",
+                authority: authority,
                 openOrders: accounts[6],
                 targetOrders: "CZza3Ej4Mc58MnxWA385itCC9jCo3L1D7zc3LKy1bZMR",
-                baseVault: "DQyrAcCrDXQ7NeoqGgDCZwBvWDcYmFCjSb9JtteuvPpz",
-                quoteVault: "HLmqeL62xR1QoZ1HKKbXRrdN1p3phKpxRMb2VVopvBBz",        
+                baseVault: accounts[14],
+                quoteVault: accounts[18],       
                 withdrawQueue: "11111111111111111111111111111111",
                 lpVault: "11111111111111111111111111111111",
                 marketVersion: 4,
