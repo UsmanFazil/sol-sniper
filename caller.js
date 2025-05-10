@@ -104,9 +104,6 @@ async function fetchRaydiumMints(txId, connection) {
       console.log("marketBids:", accounts[5]);
       console.log("marketAsks:", accounts[6]);
       console.log("marketEventQueue:", accounts[7]);
-      
-      console.log("baseVault:", accounts[14]);
-      console.log("quoteVault:", accounts[15]);
 
     const newPair = {
         official: [
@@ -129,7 +126,7 @@ async function fetchRaydiumMints(txId, connection) {
                 lpVault: "11111111111111111111111111111111",
                 marketVersion: 4,
                 marketProgramId: "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX",
-                marketId: "8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6",
+                marketId: accounts[16],
                 marketAuthority: "CTz5UMLQm2SRWHzQnU62Pi4yJqbNGjgRBHqqp6oDHfF7",
                 marketBaseVault: "CKxTHwM9fPMRRvZmFnFoqKNd9pQR21c5Aq9bh5h9oghX",
                 marketQuoteVault: "6A5NHCj1yF6urc9wZNe6Bcjj4LVszQNj5DwAWG97yzMu",

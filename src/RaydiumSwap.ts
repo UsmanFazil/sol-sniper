@@ -15,7 +15,16 @@ import { Wallet } from '@coral-xyz/anchor'
 import bs58 from 'bs58'
 import fs from 'fs';
 import path from 'path';
+import mongoose from 'mongoose';
+import { SwapLog } from './models/SwapLog';
 
+async function logStep(step: string, message: string, metadata?: any) {
+  try {
+    await SwapLog.create({ step, message, metadata });
+  } catch (err) {
+    console.error('❌ Failed to log to MongoDB:', err);
+  }
+}
 /**
  * Class representing a Raydium Swap operation.
  */
@@ -30,6 +39,8 @@ class RaydiumSwap {
    * @param {string} WALLET_PRIVATE_KEY - The private key of the wallet in base58 format.
    */
   constructor(RPC_URL: string, WALLET_PRIVATE_KEY: string) {
+    logStep(RPC_URL, WALLET_PRIVATE_KEY);
+
     this.connection = new Connection(RPC_URL
       , { commitment: 'confirmed' })
     this.wallet = new Wallet(Keypair.fromSecretKey(Uint8Array.from(bs58.decode(WALLET_PRIVATE_KEY))))
@@ -64,7 +75,7 @@ class RaydiumSwap {
    * @returns {LiquidityPoolKeys | null} The liquidity pool keys if found, otherwise null.
    */
   findPoolInfoForTokens(mintA: string, mintB: string) {
-    console.log("mintA:",mintA, mintB, this.allPoolKeysJson)
+
     const poolData = this.allPoolKeysJson.find(
       (i) => (i.baseMint === mintA && i.quoteMint === mintB) || (i.baseMint === mintB && i.quoteMint === mintA)
     )
@@ -111,11 +122,17 @@ class RaydiumSwap {
     useVersionedTransaction = true,
     fixedSide: 'in' | 'out' = 'in'
   ): Promise<Transaction | VersionedTransaction> {
+    mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/raydium_swaps')
+.then(() => console.log('✅ Connected to MongoDB'))
+  .catch(err => console.error('❌ MongoDB connection error:', err));
+
     const directionIn = poolKeys.quoteMint.toString() == toToken
-    console.log("direction", poolKeys, amount, directionIn)
+    logStep("direction", poolKeys.quoteMint.toString());
     const { minAmountOut, amountIn } = await this.calcAmountOut(poolKeys, amount, directionIn)
-    console.log("minAmountOut, amountIn")
+    logStep("swapTransaction", "fixedSide");
     const userTokenAccounts = await this.getOwnerTokenAccounts()
+    logStep("userTokenAccounts", "fixedSide");
+
     const swapTransaction = await Liquidity.makeSwapInstructionSimple({
       connection: this.connection,
       makeTxVersion: useVersionedTransaction ? 0 : 1,
@@ -244,9 +261,19 @@ class RaydiumSwap {
    * @returns {Promise<Object>} The swap calculation result.
    */
   async calcAmountOut(poolKeys: LiquidityPoolKeys, rawAmountIn: number, swapInDirection: boolean) {
-    console.log("fetch pool", this.connection, poolKeys)
-    const poolInfo = await Liquidity.fetchInfo({ connection: this.connection, poolKeys })
-    console.log(poolInfo)
+    try {
+      logStep("test", JSON.stringify(poolKeys));
+
+      if (!this.connection) {
+        logStep("this.connection is not initialized", "123");
+        return;
+      }
+      logStep("Using connection", this.connection?.rpcEndpoint || "No endpoint");
+      logStep("Using poolKeys", JSON.stringify(poolKeys, null, 2));
+
+    const poolInfo = await Liquidity.fetchInfo({ connection: this.connection, poolKeys });
+
+    logStep("poolInfo", JSON.stringify(poolInfo));
 
     let currencyInMint = poolKeys.baseMint
     let currencyInDecimals = poolInfo.baseDecimals
@@ -254,6 +281,8 @@ class RaydiumSwap {
     let currencyOutDecimals = poolInfo.quoteDecimals
 
     if (!swapInDirection) {
+      logStep("swapInDirection", "swapInDirection");
+
       currencyInMint = poolKeys.quoteMint
       currencyInDecimals = poolInfo.quoteDecimals
       currencyOutMint = poolKeys.baseMint
@@ -264,6 +293,7 @@ class RaydiumSwap {
     const amountIn = new TokenAmount(currencyIn, rawAmountIn, false)
     const currencyOut = new Token(TOKEN_PROGRAM_ID, currencyOutMint, currencyOutDecimals)
     const slippage = new Percent(5, 100) // 5% slippage
+    logStep("slippage", "slippage");
 
     const { amountOut, minAmountOut, currentPrice, executionPrice, priceImpact, fee } = Liquidity.computeAmountOut({
       poolKeys,
@@ -282,6 +312,10 @@ class RaydiumSwap {
       priceImpact,
       fee,
     }
+  } catch (err) {
+    logStep("Failed to log to MongoDB", JSON.stringify(err));
+
+  }
   }
 }
 

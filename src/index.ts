@@ -1,8 +1,20 @@
 import mongoose from 'mongoose';
 import RaydiumSwap from './RaydiumSwap';
-import { Transaction, VersionedTransaction } from '@solana/web3.js';
+import { VersionedTransaction } from '@solana/web3.js';
 import 'dotenv/config';
 import { swapConfig } from './swapConfig'; // Import the configuration
+import {
+  getAssociatedTokenAddress,
+  createAssociatedTokenAccountInstruction,
+} from "@solana/spl-token";
+import {
+  PublicKey,
+  Connection,
+  Transaction,
+  sendAndConfirmTransaction,
+  SystemProgram,
+  Keypair,
+} from "@solana/web3.js";
 
 // MongoDB connection
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/raydium_swaps')
@@ -87,7 +99,7 @@ const swap = async () => {
     quoteToken,
     amount: 22,
     txid: null,
-    status: "Loaded pool keys",
+    status: "Loading pool keys",
     errorMessage: null,
   });
   
@@ -110,16 +122,30 @@ const swap = async () => {
     return 'Pool info not found';
   } else {
     console.log('Found pool info');
-  }
-
-  try {
     await saveSwapDetails({
       baseToken,
       quoteToken,
-      amount: 10,
-      txid: poolInfo.quoteMint.toString(),
-      status: swapConfig,
+      amount: swapConfig.tokenAAmount,
+      txid: null,
+      status: "good1",
+      errorMessage: "Pool info found",
     });
+  }
+
+  try {
+    const t1 = swapConfig.tokenBAddress
+    const t2 = swapConfig.tokenAAmount
+
+    await saveSwapDetails({
+      baseToken,
+      quoteToken,
+      amount: swapConfig.tokenAAmount,
+      txid: null,
+      status: "swapping starts",
+      errorMessage: "swapping starts",
+    });
+
+    
     
   /**
    * Prepare the swap transaction with the given parameters.
@@ -133,18 +159,82 @@ const swap = async () => {
     swapConfig.direction
   );
 
-    await saveSwapDetails({
-      baseToken,
-      quoteToken,
-      amount: 10,
-      txid: tx,
-      status: "Swapping done in progress",
-    });
+  await saveSwapDetails({
+    baseToken,
+    quoteToken,
+    amount: 16,
+    txid: null,
+    status: "getSwapTransaction",
+    errorMessage: "ata",
+  });
+  const connection = new Connection(process.env.RPC_URL!, "confirmed");
+  const walletKeypair = raydiumSwap.wallet; // Assuming wallet is a Keypair
+  const walletPublicKey = walletKeypair.publicKey;
+  
+  const tokenAMint = new PublicKey(swapConfig.tokenAAddress);
+  const tokenBMint = new PublicKey(swapConfig.tokenBAddress);
+  
+  const tokenAATA = await getAssociatedTokenAddress(tokenAMint, walletPublicKey);
+  const tokenBATA = await getAssociatedTokenAddress(tokenBMint, walletPublicKey);
+  
+  const tokenAInfo = await connection.getAccountInfo(tokenAATA);
+  const tokenBInfo = await connection.getAccountInfo(tokenBATA);
+  
+  const ataInstructions: Transaction = new Transaction();
+  
+  if (!tokenAInfo) {
+    console.warn(`⚠️ Creating missing ATA for token A: ${swapConfig.tokenAAddress}`);
+    ataInstructions.add(
+      createAssociatedTokenAccountInstruction(
+        walletPublicKey,
+        tokenAATA,
+        walletPublicKey,
+        tokenAMint
+      )
+    );
+  }
+  
+  if (!tokenBInfo) {
+    console.warn(`⚠️ Creating missing ATA for token B: ${swapConfig.tokenBAddress}`);
+    ataInstructions.add(
+      createAssociatedTokenAccountInstruction(
+        walletPublicKey,
+        tokenBATA,
+        walletPublicKey,
+        tokenBMint
+      )
+    );
+  }
+  const walletKeypair1 = Keypair.fromSecretKey(
+    Uint8Array.from(JSON.parse(process.env.PRIVATE_KEY!))
+  );
+  // Only send if at least one ATA was missing
+  if (ataInstructions.instructions.length > 0) {
+    await sendAndConfirmTransaction(connection, ataInstructions, [walletKeypair1]);
+    console.log("✅ ATA(s) created");
+  }
+  
+  await saveSwapDetails({
+    tokenAInfo,
+    tokenBInfo,
+    amount: 19,
+    txid: null,
+    status: "ata",
+    errorMessage: "ata",
+  });
 
   /**
    * Depending on the configuration, execute or simulate the swap.
    */
   if (swapConfig.executeSwap) {
+
+    await saveSwapDetails({
+      baseToken,
+      quoteToken,
+      amount: 10,
+      txid: null,
+      status: "executeSwap",
+    });
     /**
      * Send the transaction to the network and log the transaction ID.
      */
@@ -167,12 +257,19 @@ const swap = async () => {
     /**
      * Simulate the transaction and log the result.
      */
+    await saveSwapDetails({
+      baseToken,
+      quoteToken,
+      amount: 10,
+      txid: null,
+      status: "Swapping done in progress",
+    });
     const simRes = swapConfig.useVersionedTransaction
       ? await raydiumSwap.simulateVersionedTransaction(tx as VersionedTransaction)
       : await raydiumSwap.simulateLegacyTransaction(tx as Transaction);
 
     console.log(simRes);
-    await saveSwapDetails({
+    await saveSwapDetails({ 
       baseToken,
       quoteToken,
       amount: swapConfig.tokenAAmount,
@@ -191,7 +288,7 @@ const swap = async () => {
     amount: swapConfig.tokenAAmount,
     txid: null,
     status: "Failed error",
-    errorMessage: error.message,
+    errorMessage: JSON.stringify(error),
   });
 }
 };
