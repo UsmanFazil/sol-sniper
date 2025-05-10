@@ -1,4 +1,9 @@
-import { Transaction, VersionedTransaction, sendAndConfirmTransaction } from '@solana/web3.js'
+import {
+  Transaction,
+  VersionedTransaction,
+  sendAndConfirmTransaction,
+  PublicKey,
+} from '@solana/web3.js'
 import { NATIVE_MINT } from '@solana/spl-token'
 import axios from 'axios'
 import { connection, owner, fetchTokenAccountData } from '../config'
@@ -8,8 +13,6 @@ interface SwapCompute {
   id: string
   success: true
   version: 'V0' | 'V1'
-  openTime?: undefined
-  msg: undefined
   data: {
     swapType: 'BaseIn' | 'BaseOut'
     inputMint: string
@@ -31,86 +34,105 @@ interface SwapCompute {
 }
 
 export const apiSwap = async () => {
-  const inputMint = NATIVE_MINT.toBase58()
-  const outputMint = '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R' // RAY
-  const amount = 10000
-  const slippage = 0.5 // in percent, for this example, 0.5 means 0.5%
-  const txVersion: string = 'V0' // or LEGACY
+  const inputMint = NATIVE_MINT.toBase58() // ✅ SOL (native mint)
+  const outputMint = '9b1fXmgJLMfcrBvXC2o5yP9fLPDnF421duBLH7inYUmM' // ✅ USDT
+  const amount = 0.01 * 1e9 // ✅ 0.01 SOL (in lamports)
+  const slippage = 0.5 // 0.5% slippage
+  const txVersion = 'V0'
   const isV0Tx = txVersion === 'V0'
 
-  const [isInputSol, isOutputSol] = [inputMint === NATIVE_MINT.toBase58(), outputMint === NATIVE_MINT.toBase58()]
+  const [isInputSol, isOutputSol] = [
+    inputMint === NATIVE_MINT.toBase58(),
+    outputMint === NATIVE_MINT.toBase58(),
+  ]
 
   const { tokenAccounts } = await fetchTokenAccountData()
   const inputTokenAcc = tokenAccounts.find((a) => a.mint.toBase58() === inputMint)?.publicKey
   const outputTokenAcc = tokenAccounts.find((a) => a.mint.toBase58() === outputMint)?.publicKey
 
   if (!inputTokenAcc && !isInputSol) {
-    console.error('do not have input token account')
+    console.error('❌ Missing input token account')
     return
   }
 
-  // get statistical transaction fee from api
-  /**
-   * vh: very high
-   * h: high
-   * m: medium
-   */
-  const { data } = await axios.get<{
+  const { data: priorityFeeResp } = await axios.get<{
     id: string
     success: boolean
     data: { default: { vh: number; h: number; m: number } }
   }>(`${API_URLS.BASE_HOST}${API_URLS.PRIORITY_FEE}`)
 
   const { data: swapResponse } = await axios.get<SwapCompute>(
-    `${
-      API_URLS.SWAP_HOST
-    }/compute/swap-base-in?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${
-      slippage * 100
-    }&txVersion=${txVersion}`
+    `${API_URLS.SWAP_HOST}/compute/swap-base-in?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amount}&slippageBps=${slippage * 100}&txVersion=${txVersion}`
   )
 
+  if (!swapResponse?.data?.routePlan?.length) {
+    console.error('❌ No swap route found. Try increasing amount or check tokens.')
+    console.dir(swapResponse, { depth: null })
+    return
+  }
+
+  console.log('✅ Swap quote:', {
+    outputAmount: swapResponse.data.outputAmount,
+    routePlan: swapResponse.data.routePlan.map((r) => r.poolId),
+  })
+
+  const txPayload = {
+    computeUnitPriceMicroLamports: String(priorityFeeResp.data.default.h),
+    swapResponse,
+    txVersion,
+    wallet: owner.publicKey.toBase58(),
+    wrapSol: isInputSol,
+    unwrapSol: isOutputSol,
+    inputAccount: isInputSol ? undefined : inputTokenAcc?.toBase58(),
+    outputAccount: isOutputSol ? undefined : outputTokenAcc?.toBase58(),
+  }
+
+  console.log('📤 Sending transaction to Raydium...')
   const { data: swapTransactions } = await axios.post<{
     id: string
     version: string
     success: boolean
     data: { transaction: string }[]
-  }>(`${API_URLS.SWAP_HOST}/transaction/swap-base-in`, {
-    computeUnitPriceMicroLamports: String(data.data.default.h),
-    swapResponse,
-    txVersion,
-    wallet: owner.publicKey.toBase58(),
-    wrapSol: isInputSol,
-    unwrapSol: isOutputSol, // true means output mint receive sol, false means output mint received wsol
-    inputAccount: isInputSol ? undefined : inputTokenAcc?.toBase58(),
-    outputAccount: isOutputSol ? undefined : outputTokenAcc?.toBase58(),
-  })
+  }>(`${API_URLS.SWAP_HOST}/transaction/swap-base-in`, txPayload)
+
+  if (!swapTransactions?.data?.length) {
+    console.error('❌ No transactions returned from Raydium API')
+    console.dir(swapTransactions, { depth: null })
+    return
+  }
 
   const allTxBuf = swapTransactions.data.map((tx) => Buffer.from(tx.transaction, 'base64'))
   const allTransactions = allTxBuf.map((txBuf) =>
     isV0Tx ? VersionedTransaction.deserialize(txBuf) : Transaction.from(txBuf)
   )
 
-  console.log(`total ${allTransactions.length} transactions`, swapTransactions)
+  console.log(`🔁 Executing ${allTransactions.length} transaction(s)...`)
 
   let idx = 0
   if (!isV0Tx) {
     for (const tx of allTransactions) {
-      console.log(`${++idx} transaction sending...`)
+      console.log(`🔄 Sending legacy tx ${++idx}...`)
       const transaction = tx as Transaction
       transaction.sign(owner)
-      const txId = await sendAndConfirmTransaction(connection, transaction, [owner], { skipPreflight: true })
-      console.log(`${++idx} transaction confirmed, txId: ${txId}`)
+      const txId = await sendAndConfirmTransaction(connection, transaction, [owner], {
+        skipPreflight: true,
+      })
+      console.log(`✅ Confirmed legacy tx ${idx}: ${txId}`)
     }
   } else {
     for (const tx of allTransactions) {
       idx++
       const transaction = tx as VersionedTransaction
       transaction.sign([owner])
-      const txId = await connection.sendTransaction(tx as VersionedTransaction, { skipPreflight: true })
+
       const { lastValidBlockHeight, blockhash } = await connection.getLatestBlockhash({
         commitment: 'finalized',
       })
-      console.log(`${idx} transaction sending..., txId: ${txId}`)
+
+      const txId = await connection.sendTransaction(transaction, { skipPreflight: true })
+
+      console.log(`🔄 Sending v0 tx ${idx}: ${txId}`)
+
       await connection.confirmTransaction(
         {
           blockhash,
@@ -119,8 +141,17 @@ export const apiSwap = async () => {
         },
         'confirmed'
       )
-      console.log(`${idx} transaction confirmed`)
+
+      console.log(`✅ Confirmed v0 tx ${idx}`)
     }
   }
 }
-// apiSwap()
+
+// 🚀 Run the swap
+apiSwap().catch((err) => {
+  console.error('❌ Swap failed:', err)
+})
+
+process.on('unhandledRejection', (reason) => {
+  console.error('🚨 Unhandled Promise Rejection:', reason)
+})
