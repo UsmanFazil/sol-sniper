@@ -33,11 +33,17 @@ interface SwapCompute {
   }
 }
 
-export const apiSwap = async () => {
-  const inputMint = NATIVE_MINT.toBase58() // ✅ SOL (native mint)
-  const outputMint = '9b1fXmgJLMfcrBvXC2o5yP9fLPDnF421duBLH7inYUmM' // ✅ USDT
-  const amount = 0.01 * 1e9 // ✅ 0.01 SOL (in lamports)
-  const slippage = 0.5 // 0.5% slippage
+export const apiSwap = async ({
+  inputMint,
+  outputMint,
+  amount = 0.01 * 1e9,
+  slippage = 0.5
+} = {} as {
+  inputMint: string
+  outputMint: string
+  amount?: number
+  slippage?: number
+}) => {
   const txVersion = 'V0'
   const isV0Tx = txVersion === 'V0'
 
@@ -108,50 +114,27 @@ export const apiSwap = async () => {
 
   console.log(`🔁 Executing ${allTransactions.length} transaction(s)...`)
 
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized')
+
   let idx = 0
-  if (!isV0Tx) {
-    for (const tx of allTransactions) {
-      console.log(`🔄 Sending legacy tx ${++idx}...`)
-      const transaction = tx as Transaction
-      transaction.sign(owner)
-      const txId = await sendAndConfirmTransaction(connection, transaction, [owner], {
-        skipPreflight: true,
-      })
-      console.log(`✅ Confirmed legacy tx ${idx}: ${txId}`)
-    }
-  } else {
-    for (const tx of allTransactions) {
-      idx++
-      const transaction = tx as VersionedTransaction
-      transaction.sign([owner])
+  for (const tx of allTransactions) {
+    idx++
+    const transaction = tx as VersionedTransaction
+    transaction.sign([owner])
 
-      const { lastValidBlockHeight, blockhash } = await connection.getLatestBlockhash({
-        commitment: 'finalized',
-      })
+    const txId = await connection.sendTransaction(transaction, { skipPreflight: true })
 
-      const txId = await connection.sendTransaction(transaction, { skipPreflight: true })
+    console.log(`🔄 Sending v0 tx ${idx}: ${txId}`)
 
-      console.log(`🔄 Sending v0 tx ${idx}: ${txId}`)
+    await connection.confirmTransaction(
+      {
+        blockhash,
+        lastValidBlockHeight,
+        signature: txId,
+      },
+      'confirmed'
+    )
 
-      await connection.confirmTransaction(
-        {
-          blockhash,
-          lastValidBlockHeight,
-          signature: txId,
-        },
-        'confirmed'
-      )
-
-      console.log(`✅ Confirmed v0 tx ${idx}`)
-    }
+    console.log(`✅ Confirmed v0 tx ${idx}`)
   }
 }
-
-// 🚀 Run the swap
-apiSwap().catch((err) => {
-  console.error('❌ Swap failed:', err)
-})
-
-process.on('unhandledRejection', (reason) => {
-  console.error('🚨 Unhandled Promise Rejection:', reason)
-})
