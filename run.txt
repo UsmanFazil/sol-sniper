@@ -1,0 +1,58 @@
+# Setup and Run Commands for Solana Wallet Token Monitor with Swap Integration
+
+This file contains the steps to set up and run the Solana Wallet Token Monitor with the integrated swap functionality via the Node.js CLI wrapper.
+
+## 1. Navigate to the sol-sniper directory
+
+Open your terminal and change the current directory to the `sol-sniper` project folder:
+
+```bash
+cd sol-sniper
+```
+
+## 2. Install Node.js Dependencies
+
+Install the necessary Node.js packages, including the original project dependencies and the `yargs` library for the CLI wrapper:
+
+```bash
+npm install
+```
+
+## 3. Compile the TypeScript CLI Wrapper
+
+Compile the TypeScript CLI script into JavaScript using the build script defined in `package.json`:
+
+```bash
+npm run build:cli
+```
+This will create the executable JavaScript file at `js/cli/swap-cli.js`.
+
+## 4. Navigate back to the Project Root Directory
+
+Change the directory back to the main project root where the `wallet_trigger` folder is located:
+
+```bash
+cd ..
+```
+
+## 5. Install Python Dependencies
+
+Install the required Python libraries, specifically `httpx`:
+
+```bash
+pip install httpx
+```
+
+## 6. Configure sol-sniper
+
+Ensure your `sol-sniper/src/config.ts` file is correctly configured with your Solana wallet details, RPC endpoint URL, and any other necessary settings. **This is a manual step you must perform.**
+
+## 7. Run the Python GUI Script
+
+Execute the main Python script to start the wallet monitor GUI:
+
+```bash
+python wallet_trigger/tk_wallet_gui.py
+```
+
+Follow these steps in order. Once the Python script is running, the GUI will appear, and the integrated swap functionality will be available when a sell trigger is activated.
